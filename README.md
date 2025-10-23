@@ -5,7 +5,6 @@ A word embedding library based on the continuous bag of words model from word2ve
 The ```Word2Vec``` class generates word embeddings from the provided corpus using unsupervised learning.
 
 ```
-
 /* Create Word2Vec Instance */
 
 std::vector<std::string> corpus = { "a", "very", "long", "list", "of", "words", "for", "training" };
@@ -17,11 +16,9 @@ Word2Vec myWord2Vec(
     contextWindowSize,
     embedDimension
 );
-
 ```
 
 ```
-
 /* Batch Train */
 
 int batchSize = 5;
@@ -31,16 +28,13 @@ myWord2Vec.train(
     batchSize,
     learningRate
 );
-
 ```
 
 ```
-
 /* Find Similar Words */
 
 std::string word = "cat";
 int n = 3;
 
 std::vector<std::string> nMostSimilarToWord = myWord2Vec.findSimilar(word, n);
-
 ```
