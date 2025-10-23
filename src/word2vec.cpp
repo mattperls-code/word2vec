@@ -1,4 +1,4 @@
-#include "cbow.hpp"
+#include "word2vec.hpp"
 
 #include <iostream>
 #include <algorithm>
@@ -13,7 +13,7 @@
 #include <xtensor/misc/xsort.hpp>
 #include <xtensor/io/xio.hpp>
 
-void CBOW_Partials::operator+=(const CBOW_Partials& other)
+void Word2VecLossPartials::operator+=(const Word2VecLossPartials& other)
 {
     if (this->empty) {
         this->empty = false;
@@ -33,15 +33,15 @@ void CBOW_Partials::operator+=(const CBOW_Partials& other)
     }
 };
 
-CBOW::CBOW(std::vector<std::string> corpus, int contextWindowSize, size_t embedDimensions)
+Word2Vec::Word2Vec(std::vector<std::string> corpus, int contextWindowSize, size_t embedDimensions)
 {
-    if (contextWindowSize < 1) throw std::runtime_error("CBOW constructor: contextWindowSize must be at least 1");
+    if (contextWindowSize < 1) throw std::runtime_error("Word2Vec constructor: contextWindowSize must be at least 1");
 
     this->contextWindowSize = contextWindowSize;
 
     /* populate validated corpus and vocabulary */
 
-    if (corpus.size() < 1 + 2 * this->contextWindowSize) throw std::runtime_error("CBOW constructor: invalid corpus"); // at least 5 before 5 after
+    if (corpus.size() < 1 + 2 * this->contextWindowSize) throw std::runtime_error("Word2Vec constructor: invalid corpus"); // at least 5 before 5 after
 
     this->corpus.reserve(corpus.size());
 
@@ -61,7 +61,7 @@ CBOW::CBOW(std::vector<std::string> corpus, int contextWindowSize, size_t embedD
 
     /* random init embeddings */
 
-    if (embedDimensions == 0) throw std::runtime_error("CBOW constructor: invalid embed dimensions");
+    if (embedDimensions == 0) throw std::runtime_error("Word2Vec constructor: invalid embed dimensions");
 
     this->embedDimensions = embedDimensions;
 
@@ -72,12 +72,12 @@ CBOW::CBOW(std::vector<std::string> corpus, int contextWindowSize, size_t embedD
     this->outputEmbedMatrix = xt::random::rand<float>({ this->vocabMapFromIndex.size(), this->embedDimensions }) - 0.5;
 };
 
-void CBOW::assertWordInVocab(std::string word, std::string caller)
+void Word2Vec::assertWordInVocab(std::string word, std::string caller)
 {
-    if (!this->vocabMapFromWord.contains(word)) throw std::runtime_error("CBOW " + caller + ": word \"" + word + "\" is not in vocab");
+    if (!this->vocabMapFromWord.contains(word)) throw std::runtime_error("Word2Vec " + caller + ": word \"" + word + "\" is not in vocab");
 };
 
-void CBOW::print()
+void Word2Vec::print()
 {
     std::cout << "Embed Dimension: " << this->embedDimensions << std::endl << std::endl;
 
@@ -108,7 +108,7 @@ void CBOW::print()
     std::cout << "OutputEmbedTable: " << std::endl << this->outputEmbedMatrix << std::endl;
 };
 
-xt::xtensor<float, 1> CBOW::calculateFF(std::vector<std::string> context)
+xt::xtensor<float, 1> Word2Vec::calculateFF(std::vector<std::string> context)
 {
     for (const auto& word : context) this->assertWordInVocab(word, "calculateFF");
 
@@ -133,7 +133,7 @@ xt::xtensor<float, 1> CBOW::calculateFF(std::vector<std::string> context)
     return normalizedOutput;
 };
 
-std::vector<std::string> CBOW::predictNextWords(std::vector<std::string> context, int n)
+std::vector<std::string> Word2Vec::predictNextWords(std::vector<std::string> context, int n)
 {
     for (const auto& word : context) this->assertWordInVocab(word, "predictNextWord");
 
@@ -156,7 +156,7 @@ std::vector<std::string> CBOW::predictNextWords(std::vector<std::string> context
     return topN;
 };
 
-float CBOW::calculateLoss(std::vector<std::string> context, std::string expectedWord)
+float Word2Vec::calculateLoss(std::vector<std::string> context, std::string expectedWord)
 {
     for (const auto& word : context) this->assertWordInVocab(word, "calculateLoss");
     this->assertWordInVocab(expectedWord, "calculateLoss");
@@ -170,7 +170,7 @@ float CBOW::calculateLoss(std::vector<std::string> context, std::string expected
     return -log(std::clamp(observed(this->vocabMapFromWord[expectedWord]), epsilon, 1.0f - epsilon));
 };
 
-CBOW_Partials CBOW::calculateLossPartials(std::vector<unsigned int> context, unsigned int expectedWord)
+Word2VecLossPartials Word2Vec::calculateLossPartials(std::vector<unsigned int> context, unsigned int expectedWord)
 {
     // FEEDFORWARD
 
@@ -209,19 +209,19 @@ CBOW_Partials CBOW::calculateLossPartials(std::vector<unsigned int> context, uns
 
     for (const auto& word : context) dLossWrtInputEmbedTable[word] = dLossWrtContextEmbed;
 
-    return CBOW_Partials(dLossWrtInputEmbedTable, dLossWrtOutputEmbedMatrix);
+    return Word2VecLossPartials(dLossWrtInputEmbedTable, dLossWrtOutputEmbedMatrix);
 };
 
-void CBOW::applyLossPartials(CBOW_Partials partials, float scalar)
+void Word2Vec::applyLossPartials(Word2VecLossPartials partials, float scalar)
 {
     for (const auto& [word, dLossWrtEmbed] : partials.inputEmbedTable) this->inputEmbedTable[word] -= scalar * dLossWrtEmbed;
 
     this->outputEmbedMatrix -= partials.outputEmbedMatrix * scalar;
 };
 
-void CBOW::train(int batchSize, float learningRate)
+void Word2Vec::train(int batchSize, float learningRate)
 {
-    CBOW_Partials batchLossPartials;
+    Word2VecLossPartials batchLossPartials;
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -244,11 +244,11 @@ void CBOW::train(int batchSize, float learningRate)
     this->applyLossPartials(batchLossPartials, learningRate / batchSize);
 };
 
-std::vector<std::string> CBOW::findSimilar(std::string word, int n)
+std::vector<std::string> Word2Vec::findSimilar(std::string word, int n)
 {
     this->assertWordInVocab(word, "findSimilar");
 
-    if (n < 1) throw std::runtime_error("CBOW findSimilar: n must be positive");
+    if (n < 1) throw std::runtime_error("Word2Vec findSimilar: n must be positive");
 
     // pairs are { (negative for min-heap) similarity, wordIndex }, pq auto compares by first item
     std::priority_queue<std::pair<float, unsigned int>> mostSimilar;
@@ -304,7 +304,7 @@ namespace cereal {
     };
 };
 
-bool CBOW::save(std::string backupFilePath)
+bool Word2Vec::save(std::string backupFilePath)
 {
     try {
         std::filesystem::path path(backupFilePath);
@@ -322,7 +322,7 @@ bool CBOW::save(std::string backupFilePath)
     }
 };
 
-bool CBOW::load(std::string backupFilePath)
+bool Word2Vec::load(std::string backupFilePath)
 {
     try {
         std::filesystem::path path(backupFilePath);

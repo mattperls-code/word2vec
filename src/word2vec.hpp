@@ -1,5 +1,5 @@
-#ifndef SRC_CBOW
-#define SRC_CBOW
+#ifndef SRC_WORD2VEC
+#define SRC_WORD2VEC
 
 #include <string>
 #include <vector>
@@ -13,7 +13,7 @@
 #include <cereal/types/string.hpp>
 #include <cereal/types/unordered_map.hpp>
 
-class CBOW_Partials
+class Word2VecLossPartials
 {
     private:
         bool empty;
@@ -22,13 +22,13 @@ class CBOW_Partials
         std::unordered_map<unsigned int, xt::xtensor<float, 1>> inputEmbedTable;
         xt::xtensor<float, 2> outputEmbedMatrix;
 
-        CBOW_Partials(): empty(true), inputEmbedTable(), outputEmbedMatrix() {};
-        CBOW_Partials(std::unordered_map<unsigned int, xt::xtensor<float, 1>> inputEmbedTable, xt::xtensor<float, 2> outputEmbedMatrix): empty(false), inputEmbedTable(inputEmbedTable), outputEmbedMatrix(outputEmbedMatrix) {};
+        Word2VecLossPartials(): empty(true), inputEmbedTable(), outputEmbedMatrix() {};
+        Word2VecLossPartials(std::unordered_map<unsigned int, xt::xtensor<float, 1>> inputEmbedTable, xt::xtensor<float, 2> outputEmbedMatrix): empty(false), inputEmbedTable(inputEmbedTable), outputEmbedMatrix(outputEmbedMatrix) {};
 
-        void operator+=(const CBOW_Partials& other);
+        void operator+=(const Word2VecLossPartials& other);
 };
 
-class CBOW
+class Word2Vec
 {
     private:
         std::vector<unsigned int> corpus;
@@ -43,8 +43,8 @@ class CBOW
 
         void assertWordInVocab(std::string word, std::string caller);
 
-        CBOW_Partials calculateLossPartials(std::vector<unsigned int> context, unsigned int expectedWord);
-        void applyLossPartials(CBOW_Partials partials, float scalar);
+        Word2VecLossPartials calculateLossPartials(std::vector<unsigned int> context, unsigned int expectedWord);
+        void applyLossPartials(Word2VecLossPartials partials, float scalar);
 
         xt::xtensor<float, 1> calculateFF(std::vector<std::string> context);
         std::vector<std::string> predictNextWords(std::vector<std::string> context, int n);
@@ -52,7 +52,7 @@ class CBOW
         float calculateLoss(std::vector<std::string> context, std::string expectedWord);
 
     public:
-        CBOW(std::vector<std::string> corpus, int contextWindowSize, size_t embedDimensions);
+        Word2Vec(std::vector<std::string> corpus, int contextWindowSize, size_t embedDimensions);
 
         void print();
 

@@ -1,11 +1,11 @@
-#include "cbow.hpp"
+#include "word2vec.hpp"
 
 #include <fstream>
 #include <stdexcept>
 
 #include <xtensor/io/xio.hpp>
 
-void printSimilarEmbeddings(CBOW& model)
+void printSimilarEmbeddings(Word2Vec& model)
 {
     std::cout << "Similar Embeddings" << std::endl;
 
@@ -44,7 +44,7 @@ int main()
 
     std::cout << "Corpus size: " << corpus.size() << std::endl;
 
-    CBOW model = CBOW(corpus, 5, 160);
+    Word2Vec model(corpus, 5, 160);
 
     std::cout << "Built model" << std::endl << std::endl;
 
