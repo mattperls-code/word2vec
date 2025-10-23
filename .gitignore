@@ -1,0 +1,7 @@
+main
+test
+results/backups
+lib
+app/rawCorpus
+app/cleanCorpus
+.vscode
