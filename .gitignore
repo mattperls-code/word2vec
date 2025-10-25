@@ -1,7 +1,8 @@
 main
 test
-results/backups
+results/
 lib
 app/rawCorpus
 app/cleanCorpus
 .vscode
+.DS_Store

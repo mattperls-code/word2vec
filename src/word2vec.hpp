@@ -49,6 +49,8 @@ class Word2Vec
         void applyLossPartials(Word2VecLossPartials partials, float scalar);
 
     public:
+        Word2Vec() = default;
+
         Word2Vec(std::vector<std::string> corpus, int contextWindowSize, int negativeSampleCount, size_t embedDimensions);
 
         void trainRandomBatch(int batchSize, float learningRate);
