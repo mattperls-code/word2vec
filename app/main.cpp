@@ -31,47 +31,34 @@ int main()
     if (!corpusFile) throw std::runtime_error("Failed to open corpus");
 
     std::vector<std::string> corpus;
-    corpus.reserve(80000);
+    corpus.reserve(300000);
 
     std::string word;
     while (corpusFile >> word) {
         corpus.push_back(word);
 
-        if (corpus.size() == 80000) break;
+        if (corpus.size() == 300000) break;
     }
 
     corpusFile.close();
 
     std::cout << "Corpus size: " << corpus.size() << std::endl;
 
-    Word2Vec model(corpus, 5, 160);
+    Word2Vec model(corpus, 4, 10, 160);
 
     std::cout << "Built model" << std::endl << std::endl;
 
-    for (int i = 0;i<20*80000/20;i++) {
-        if (i % 10 == 0) std::cout << "Batch " << i << std::endl << std::endl;
+    printSimilarEmbeddings(model);
 
-        model.train(20, 10.0);
+    model.save("./results/backups/afterEpoch0");
 
-        if (i % 10 == 0) printSimilarEmbeddings(model);
+    for (int i = 0;i<200;i++) {
+        model.trainStochasticEpoch(0.1);
 
-        if (i % 500 == 0) model.save("./results/backups/afterBatch" + std::to_string(i));
+        printSimilarEmbeddings(model);
+
+        model.save("./results/backups/afterEpoch" + std::to_string(i + 1));
     }
 
     return 0;
 }
-
-/*
-
-    Similar Embeddings (Batch 14730)
-
-    cat: bird woman moment mice swallow tapers child made 
-    dog: clerk linnet princess maiden child swineherd prince person 
-    king: miller well royal snow some broken moon floor 
-    queen: flakes woman palace green swallow mirror evening sledge 
-    black: earth answered by street sky low clerk life 
-    white: sweet our sang room kay kind with act 
-    tree: councillor giant emperor swallow people man dragged river 
-    house: court large empty councillor children emperor hall than
-
-*/

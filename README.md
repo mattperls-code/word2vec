@@ -8,12 +8,14 @@ The ```Word2Vec``` class generates word embeddings from the provided corpus usin
 /* Create Word2Vec Instance */
 
 std::vector<std::string> corpus = { "a", "very", "long", "list", "of", "words", "for", "training" };
-std::size_t contextWindowSize = 2;
-unsigned int embedDimension = 20;
+int contextWindowSize = 2;
+int negativeSampleCount = 4;
+int embedDimension = 20;
 
 Word2Vec myWord2Vec(
     corpus,
     contextWindowSize,
+    negativeSampleCount,
     embedDimension
 );
 ```
@@ -24,10 +26,16 @@ Word2Vec myWord2Vec(
 int batchSize = 5;
 float learningRate = 0.1;
 
-myWord2Vec.train(
+myWord2Vec.trainRandomBatch(
     batchSize,
     learningRate
 );
+```
+
+```
+/* Train Stochastic Epoch */
+
+myWord2Vec.trainStochasticEpoch(learningRate);
 ```
 
 ```
@@ -37,4 +45,16 @@ std::string word = "cat";
 int n = 3;
 
 std::vector<std::string> nMostSimilarToWord = myWord2Vec.findSimilar(word, n);
+```
+
+```
+/* Save Model Parameters */
+
+myWord2Vec.save("path/to/backup");
+```
+
+```
+/* Load Model Parameters */
+
+myWord2Vec.load("path/to/backup");
 ```

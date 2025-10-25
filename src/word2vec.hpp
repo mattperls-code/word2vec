@@ -36,6 +36,7 @@ class Word2Vec
         std::vector<std::string> vocabMapFromIndex;
 
         int contextWindowSize;
+        int negativeSampleCount;
         size_t embedDimensions;
 
         std::vector<xt::xtensor<float, 1>> inputEmbedTable;
@@ -43,20 +44,15 @@ class Word2Vec
 
         void assertWordInVocab(std::string word, std::string caller);
 
-        Word2VecLossPartials calculateLossPartials(std::vector<unsigned int> context, unsigned int expectedWord);
+        Word2VecLossPartials calculateSoftmaxLossPartials(std::vector<unsigned int> context, unsigned int expectedWord);
+        Word2VecLossPartials calculateNegativeSamplingLossPartials(std::vector<unsigned int> context, unsigned int expectedWord);
         void applyLossPartials(Word2VecLossPartials partials, float scalar);
 
-        xt::xtensor<float, 1> calculateFF(std::vector<std::string> context);
-        std::vector<std::string> predictNextWords(std::vector<std::string> context, int n);
-
-        float calculateLoss(std::vector<std::string> context, std::string expectedWord);
-
     public:
-        Word2Vec(std::vector<std::string> corpus, int contextWindowSize, size_t embedDimensions);
+        Word2Vec(std::vector<std::string> corpus, int contextWindowSize, int negativeSampleCount, size_t embedDimensions);
 
-        void print();
-
-        void train(int batchSize, float learningRate);
+        void trainRandomBatch(int batchSize, float learningRate);
+        void trainStochasticEpoch(float learningRate);
 
         std::vector<std::string> findSimilar(std::string word, int n);
 
