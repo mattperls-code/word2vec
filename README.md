@@ -8,34 +8,28 @@ The ```Word2Vec``` class generates word embeddings from the provided corpus usin
 /* Create Word2Vec Instance */
 
 std::vector<std::string> corpus = { "a", "very", "long", "list", "of", "words", "for", "training" };
-int contextWindowSize = 2;
-int negativeSampleCount = 4;
-int embedDimension = 20;
+std::size_t contextWindowSize = 2;
+std::size_t negativeSampleCount = 4;
+std::size_t embedDimensions = 20;
 
 Word2Vec myWord2Vec(
     corpus,
     contextWindowSize,
     negativeSampleCount,
-    embedDimension
+    embedDimensions
 );
 ```
 
 ```cpp
-/* Batch Train */
-
-int batchSize = 5;
-float learningRate = 0.1;
-
-myWord2Vec.trainRandomBatch(
-    batchSize,
-    learningRate
-);
-```
-
-```cpp
-/* Train Stochastic Epoch */
+/* Train One Epoch */
 
 myWord2Vec.trainStochasticEpoch(learningRate);
+```
+
+```cpp
+/* Post Process Embeddings */
+
+myWord2Vec.postProcess();
 ```
 
 ```cpp
@@ -44,7 +38,27 @@ myWord2Vec.trainStochasticEpoch(learningRate);
 std::string word = "cat";
 int n = 3;
 
-std::vector<std::string> nMostSimilarToWord = myWord2Vec.findSimilar(word, n);
+std::vector<std::string> nMostSimilarToWord = myWord2Vec.findSimilarToWord(word, n);
+```
+
+```cpp
+/* View Embedding Vectors */
+
+std::vector<float> kingEmbedding = myWord2Vec.getEmbedding("king");
+```
+
+```cpp
+/* Compose Embedding Vectors */
+
+std::vector<float> compositionEmbedding;
+
+for (int i = 0;i<kingEmbedding.size();i++) {
+    compositionEmbedding.push_back(kingEmbedding[i] + womanEmbedding[i] - manEmbedding[i]);
+}
+
+int n = 5;
+
+std::vector<std::string> nMostSimilarToComposition = myWord2Vec.findSimilarToEmbedding(compositionEmbedding, n);
 ```
 
 ```cpp
