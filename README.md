@@ -75,3 +75,22 @@ myWord2Vec.save("path/to/backup");
 
 myWord2Vec.load("path/to/backup");
 ```
+
+## Text8 Word Embeddings Example
+
+### Training Data
+
+The example model was trained on the full [Text8](https://www.kaggle.com/datasets/gupta24789/text8-word-embedding) corpus, an opensource 2006 Wikipedia snapshot.
+
+### Model Parameters
+
+The model uses 150 dimension embeddings, a &plusmn;4 word context window, and a negative sample count of 10. The learning rate is fixed at 0.02.
+
+### Training Progression
+
+| **Epoch** | **Similarity Tests** | **Composition Tests** |
+|------------|----------------------|----------------------------------|
+| **0** | dog → trepp, kunsthistorisches, cornercopia <br><br> police → eigenji, arterious, ballymena <br><br> red → nomeansno, aerospacelegacyfoundation, volli <br><br> tree → altsasu, mayottensis, saccharalis <br><br> house → plyoffs, chfp, gpj | water + frozen → auditore, utukki, outputwait <br><br> king + woman - man → lucy, queynte, urkizu <br><br> plant + tall + wood → pocomoke, drawling, citg <br><br> nature - inside → sandoy, shaffers, kinchiltun <br><br> paris + italy - france → amereon, shangugu, bivalve |
+| **25** | dog → cat, dogs, baby <br><br> police → military, officer, officers <br><br> red → blue, yellow, black <br><br> tree → trees, flowers, garden <br><br> house → palace, court, home | water + frozen → dry, wet, snow <br><br> king + woman - man → queen, prince, wife <br><br> plant + tall + wood → fish, sand, water <br><br> nature - inside → temperament, mastery, grotesqueries <br><br> paris + italy - france → milan, london, venice |
+| **50** | dog → cat, bird, horse <br><br> police → military, officers, guards <br><br> red → blue, yellow, green <br><br> tree → trees, fish, leaf <br><br> house → palace, court, castle | water + frozen → salt, dry, fish <br><br> king + woman - man → queen, prince, princess <br><br> plant + tall + wood → stone, fish, water <br><br> nature - inside → morality, zoology, temperament <br><br> paris + italy - france → venice, milan, berlin |
+| **100** | dog → dogs, cat, horse <br><br> police → military, officers, officer <br><br> red → blue, yellow, green <br><br> tree → trees, flowers, garden <br><br> house → hall, room, houses | water + frozen → dry, fish, ice <br><br> king + woman - man → queen, princess, prince <br><br> plant + tall + wood → fish, plants, stone <br><br> nature - inside → morality, altruism, paradoxologia <br><br> paris + italy - france → milan, venice, rome |

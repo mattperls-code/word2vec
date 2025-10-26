@@ -94,13 +94,13 @@ void testModel()
 {
     std::cout << "Similar Embeddings" << std::endl;
 
-    std::vector<std::string> words = { "cat", "dog", "king", "queen", "black", "white", "tree", "house" };
+    std::vector<std::string> words = { "dog", "police", "red", "tree", "house" };
 
     for (const auto& word : words) {
         std::cout << word << ": ";
 
         try {
-            std::vector<std::string> similarToWord = model.findSimilarToWord(word, 8);
+            std::vector<std::string> similarToWord = model.findSimilarToWord(word, 3);
 
             for (const auto& similarWord : similarToWord) std::cout << similarWord << " ";
 
@@ -124,7 +124,7 @@ void getSimilar()
     std::cout << std::endl;
     
     try {
-        std::vector<std::string> similarToWord = model.findSimilarToWord(word, 8);
+        std::vector<std::string> similarToWord = model.findSimilarToWord(word, 3);
 
         for (const auto& similarWord : similarToWord) std::cout << similarWord << " ";
 
@@ -142,13 +142,16 @@ void evaluate()
 
     std::vector<std::vector<std::pair<std::string, float>>> linearCompositions = {
         {
+            { "water", 1.0 }, { "frozen", 1.0 }
+        },
+        {
             { "king", 1.0 }, { "woman", 1.0 }, { "man", -1.0 }
         },
         {
-            { "tall", 1.0 }, { "big", 1.0 }, { "small", -1.0 }
+            { "plant", 1.0 }, { "tall", 1.0 }, { "wood", 1.0 }
         },
         {
-            { "crying", 1.0 }, { "happy", 1.0 }, { "sad", -1.0 }
+            { "nature", 1.0 }, { "inside", -1.0 }
         },
         {
             { "paris", 1.0 }, { "italy", 1.0 }, { "france", -1.0 }
@@ -165,7 +168,7 @@ void evaluate()
         std::cout << name << ": ";
 
         try {
-            std::vector<std::string> similarToComposition = model.findSimilarToLinearComposition(linearComposition, 8);
+            std::vector<std::string> similarToComposition = model.findSimilarToLinearComposition(linearComposition, 3);
 
             for (const auto& similarWord : similarToComposition) std::cout << similarWord << " ";
 
