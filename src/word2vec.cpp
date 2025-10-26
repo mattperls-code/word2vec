@@ -203,7 +203,6 @@ std::vector<std::string> Word2Vec::findSimilarToEmbedding(std::vector<float> emb
 
     if (n < 1) throw std::runtime_error("Word2Vec findSimilarToEmbedding: n must be at least 1");
 
-    // pairs are { (negative for min-heap) similarity, wordIndex }, pq auto compares by first item
     std::priority_queue<std::pair<float, unsigned int>> mostSimilar;
 
     for (int i = 0;i<this->vocabMapFromIndex.size();i++) {
@@ -240,7 +239,6 @@ std::vector<std::string> Word2Vec::findSimilarToWord(std::string word, int n)
 
     if (n < 1) throw std::runtime_error("Word2Vec findSimilarToWord: n must be at least 1");
 
-    // pairs are { (negative for min-heap) similarity, wordIndex }, pq auto compares by first item
     std::priority_queue<std::pair<float, unsigned int>> mostSimilar;
 
     unsigned int wordIndex = this->vocabMapFromWord[word];
@@ -250,6 +248,58 @@ std::vector<std::string> Word2Vec::findSimilarToWord(std::string word, int n)
 
         float similarity = 0.0;
         for (int j = 0;j<this->embedDimensions;j++) similarity += this->outputEmbedMatrix[wordIndex * this->embedDimensions + j] * this->outputEmbedMatrix[i * this->embedDimensions + j];
+
+        mostSimilar.push({ -similarity, i });
+
+        if (mostSimilar.size() > n) mostSimilar.pop();
+    }
+
+    std::vector<std::string> topN;
+
+    while (!mostSimilar.empty()) {
+        topN.push_back(this->vocabMapFromIndex[mostSimilar.top().second]);
+
+        mostSimilar.pop();
+    }
+
+    std::reverse(topN.begin(), topN.end());
+
+    return topN;
+};
+
+std::vector<std::string> Word2Vec::findSimilarToLinearComposition(std::vector<std::pair<std::string, float>> words, int n)
+{
+    if (words.empty()) throw std::runtime_error("Word2Vec findSimilarToLinearComposition: words is empty");
+
+    if (n < 1) throw std::runtime_error("Word2Vec findSimilarToLinearComposition: n must be at least 1");
+
+    std::vector<float> composition(this->embedDimensions, 0.0);
+
+    std::unordered_set<unsigned int> wordIndices;
+
+    for (auto [word, coefficient] : words) {
+        this->assertWordInVocab(word, "findSimilarToLinearComposition");
+
+        unsigned int wordIndex = this->vocabMapFromWord[word];
+
+        for (int i = 0;i<this->embedDimensions;i++) composition[i] += coefficient * this->outputEmbedMatrix[wordIndex * this->embedDimensions + i];
+
+        wordIndices.insert(wordIndex);
+    }
+
+    std::priority_queue<std::pair<float, unsigned int>> mostSimilar;
+
+    for (int i = 0;i<this->vocabMapFromIndex.size();i++) {
+        if (wordIndices.contains(i)) continue;
+
+        float similarity = 0.0;
+        float otherMagnitude = 0.0;
+        for (int j = 0;j<this->embedDimensions;j++) {
+            similarity += composition[j] * this->outputEmbedMatrix[i * this->embedDimensions + j];
+            otherMagnitude += this->outputEmbedMatrix[i * this->embedDimensions + j] * this->outputEmbedMatrix[i * this->embedDimensions + j];
+        }
+
+        similarity /= sqrt(otherMagnitude);
 
         mostSimilar.push({ -similarity, i });
 

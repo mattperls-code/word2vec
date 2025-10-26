@@ -138,23 +138,44 @@ void getSimilar()
 
 void evaluate()
 {
-    std::cout << "Evaluating Composition" << std::endl;
+    std::cout << "Evaluating Compositions" << std::endl;
 
-    std::vector<float> kingEmbedding = model.getEmbedding("king");
-    std::vector<float> manEmbedding = model.getEmbedding("man");
-    std::vector<float> womanEmbedding = model.getEmbedding("woman");
+    std::vector<std::vector<std::pair<std::string, float>>> linearCompositions = {
+        {
+            { "king", 1.0 }, { "woman", 1.0 }, { "man", -1.0 }
+        },
+        {
+            { "tall", 1.0 }, { "big", 1.0 }, { "small", -1.0 }
+        },
+        {
+            { "crying", 1.0 }, { "happy", 1.0 }, { "sad", -1.0 }
+        },
+        {
+            { "paris", 1.0 }, { "italy", 1.0 }, { "france", -1.0 }
+        }
+    };
 
-    std::vector<float> composition;
+    for (auto linearComposition : linearCompositions) {
+        std::string name;
 
-    for (int i = 0;i<kingEmbedding.size();i++) composition.push_back(kingEmbedding[i] + womanEmbedding[i] - manEmbedding[i]);
+        for (auto [word, coefficient] : linearComposition) name += std::format("{:.2f}", coefficient) + " * " + word + " + ";
 
-    std::vector<std::string> similarToComposition = model.findSimilarToEmbedding(composition, 8);
+        for (int i = 0;i<3;i++) name.pop_back();
 
-    std::cout << "Similar to (king + woman - man): ";
+        std::cout << name << ": ";
 
-    for (const auto& similarWord : similarToComposition) std::cout << similarWord << " ";
+        try {
+            std::vector<std::string> similarToComposition = model.findSimilarToLinearComposition(linearComposition, 8);
 
-    std::cout << std::endl << std::endl;
+            for (const auto& similarWord : similarToComposition) std::cout << similarWord << " ";
+
+            std::cout << std::endl;
+        } catch (std::runtime_error err) {
+            std::cout << name << " failed: " << err.what() << std::endl;
+        };
+    }
+
+    std::cout << std::endl;
 };
 
 int main()

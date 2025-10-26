@@ -33,32 +33,35 @@ myWord2Vec.postProcess();
 ```
 
 ```cpp
-/* Find Similar Words */
-
-std::string word = "cat";
-int n = 3;
-
-std::vector<std::string> nMostSimilarToWord = myWord2Vec.findSimilarToWord(word, n);
-```
-
-```cpp
 /* View Embedding Vectors */
 
 std::vector<float> kingEmbedding = myWord2Vec.getEmbedding("king");
 ```
 
 ```cpp
-/* Compose Embedding Vectors */
+/* Find Similar By Embedding */
 
-std::vector<float> compositionEmbedding;
+std::vector<std::string> nMostSimilarToEmbedding = myWord2Vec.findSimilarToEmbedding(embedding, n);
+```
 
-for (int i = 0;i<kingEmbedding.size();i++) {
-    compositionEmbedding.push_back(kingEmbedding[i] + womanEmbedding[i] - manEmbedding[i]);
-}
+```cpp
+/* Find Similar Words */
 
-int n = 5;
+std::string word = "cat";
 
-std::vector<std::string> nMostSimilarToComposition = myWord2Vec.findSimilarToEmbedding(compositionEmbedding, n);
+std::vector<std::string> nMostSimilarToWord = myWord2Vec.findSimilarToWord(word, n);
+```
+
+```cpp
+/* Find Similar Words To Composition */
+
+std::vector<std::pair<std::string, float>> composition = {
+    { "king", 1.0 },
+    { "woman", 1.0 },
+    { "man", -1.0 }
+};
+
+std::vector<std::string> nMostSimilarToComposition = myWord2Vec.findSimilarToLinearComposition(composition, n);
 ```
 
 ```cpp

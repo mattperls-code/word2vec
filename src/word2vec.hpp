@@ -43,6 +43,8 @@ class Word2Vec
         std::vector<std::string> findSimilarToEmbedding(std::vector<float> embedding, int n);
         std::vector<std::string> findSimilarToWord(std::string word, int n);
 
+        std::vector<std::string> findSimilarToLinearComposition(std::vector<std::pair<std::string, float>> terms, int n);
+
         bool save(std::string backupFilePath);
         bool load(std::string backupFilePath);
 
