@@ -1,6 +1,7 @@
 #include "word2vec.hpp"
 
 #include <iostream>
+#include <span>
 #include <algorithm>
 #include <random>
 #include <stdexcept>
@@ -8,38 +9,13 @@
 #include <filesystem>
 #include <fstream>
 
-#include <xtensor/generators/xrandom.hpp>
-#include <xtensor-blas/xlinalg.hpp>
-#include <xtensor/misc/xsort.hpp>
-#include <xtensor/io/xio.hpp>
-
-void Word2VecLossPartials::operator+=(const Word2VecLossPartials& other)
+Word2Vec::Word2Vec(std::vector<std::string> corpus, std::size_t contextWindowSize, std::size_t negativeSampleCount, std::size_t embedDimensions)
 {
-    if (this->empty) {
-        this->empty = false;
-        this->inputEmbedTable = other.inputEmbedTable;
-        this->outputEmbedMatrix = other.outputEmbedMatrix;
-
-        return;
-    }
-    else {
-        for (const auto& [word, embedding] : other.inputEmbedTable) {
-            if (this->inputEmbedTable.contains(word)) this->inputEmbedTable[word] += embedding;
-
-            else this->inputEmbedTable[word] = embedding;
-        }
-
-        this->outputEmbedMatrix += other.outputEmbedMatrix;
-    }
-};
-
-Word2Vec::Word2Vec(std::vector<std::string> corpus, int contextWindowSize, int negativeSampleCount, size_t embedDimensions)
-{
-    if (contextWindowSize < 1) throw std::runtime_error("Word2Vec constructor: contextWindowSize must be at least 1");
+    if (contextWindowSize == 0) throw std::runtime_error("Word2Vec constructor: invalid context window size");
 
     this->contextWindowSize = contextWindowSize;
 
-    if (negativeSampleCount < 1) throw std::runtime_error("Word2Vec constructor: negativeSampleCount must be at least 1");
+    if (negativeSampleCount == 0) throw std::runtime_error("Word2Vec constructor: invalid negative sample count");
 
     this->negativeSampleCount = negativeSampleCount;
 
@@ -50,9 +26,11 @@ Word2Vec::Word2Vec(std::vector<std::string> corpus, int contextWindowSize, int n
     this->corpus.reserve(corpus.size());
 
     // estimate vocabulary size using heap's law: V ~ K • N^B
-    // approximate as K = 50, N = 10C, B = 0.5
-    this->vocabMapFromIndex.reserve(50 * sqrt(10 * corpus.size()));
-    this->vocabMapFromWord.reserve(50 * sqrt(10 * corpus.size()));
+    // approximate as K = 50, N = |corpus|, B = 0.4
+    int approxVocabSize = 50.0 * pow(corpus.size(), 0.4);
+
+    this->vocabMapFromIndex.reserve(approxVocabSize);
+    this->vocabMapFromWord.reserve(approxVocabSize);
 
     for (const auto& word : corpus) {
         if (!vocabMapFromWord.contains(word)) {
@@ -69,11 +47,18 @@ Word2Vec::Word2Vec(std::vector<std::string> corpus, int contextWindowSize, int n
 
     this->embedDimensions = embedDimensions;
 
-    this->inputEmbedTable.reserve(this->vocabMapFromIndex.size());
-    
-    for (const auto& _ : this->vocabMapFromIndex) this->inputEmbedTable.push_back(xt::random::rand<float>({ this->embedDimensions }) - 0.5);
+    std::size_t embedMatrixSize = this->vocabMapFromIndex.size() * this->embedDimensions;
 
-    this->outputEmbedMatrix = xt::random::rand<float>({ this->vocabMapFromIndex.size(), this->embedDimensions }) - 0.5;
+    this->inputEmbedMatrix.reserve(embedMatrixSize);
+    this->outputEmbedMatrix.reserve(embedMatrixSize);
+
+    std::mt19937 gen(std::random_device{}());
+    std::uniform_real_distribution<float> getRandomWeight(-0.1, 0.1);
+
+    for (int i = 0;i<embedMatrixSize;i++) {
+        this->inputEmbedMatrix.push_back(getRandomWeight(gen));
+        this->outputEmbedMatrix.push_back(getRandomWeight(gen));
+    };
 };
 
 void Word2Vec::assertWordInVocab(std::string word, std::string caller)
@@ -81,59 +66,18 @@ void Word2Vec::assertWordInVocab(std::string word, std::string caller)
     if (!this->vocabMapFromWord.contains(word)) throw std::runtime_error("Word2Vec " + caller + ": word \"" + word + "\" is not in vocab");
 };
 
-Word2VecLossPartials Word2Vec::calculateSoftmaxLossPartials(std::vector<unsigned int> context, unsigned int expectedWord)
+void Word2Vec::train(std::vector<unsigned int> context, unsigned int expectedWord, float learningRate)
 {
     // FEEDFORWARD
 
     /* projection is avg of context embeddings  */
 
-    xt::xtensor<float, 1> projection = xt::zeros<float>({ this->embedDimensions });
+    std::vector<float> projection(this->embedDimensions, 0.0);
 
-    for (int i = 0;i<context.size();i++) projection += this->inputEmbedTable[context[i]];
-
-    projection /= context.size();
-
-    /* apply output embed matrix transform */
-
-    xt::xtensor<float, 1> prenormalizedOutput = xt::linalg::dot(this->outputEmbedMatrix, projection);
-
-    /* softmax */
-
-    xt::xtensor<float, 1> expPrenormalizedOutput = exp(prenormalizedOutput - xt::amax(prenormalizedOutput)());
-
-    xt::xtensor<float, 1> normalizedOutput = expPrenormalizedOutput / sum(expPrenormalizedOutput);
-
-    // BACKPROP
-
-    /* simplified cce derivative using softmax output */
-
-    xt::xtensor<float, 1> dLossWrtPrenormalizedOutput = normalizedOutput;
-    dLossWrtPrenormalizedOutput(expectedWord) -= 1.0;
-
-    /* chain rule to determine loss partial wrt output embed matrix and context embed */
-
-    xt::xtensor<float, 2> dLossWrtOutputEmbedMatrix = xt::linalg::outer(dLossWrtPrenormalizedOutput, projection);
-
-    xt::xtensor<float, 1> dLossWrtContextEmbed = xt::linalg::dot(xt::transpose(this->outputEmbedMatrix), dLossWrtPrenormalizedOutput) / context.size();
-    
-    std::unordered_map<unsigned int, xt::xtensor<float, 1>> dLossWrtInputEmbedTable;
-
-    for (const auto& word : context) dLossWrtInputEmbedTable[word] = dLossWrtContextEmbed;
-
-    return Word2VecLossPartials(dLossWrtInputEmbedTable, dLossWrtOutputEmbedMatrix);
-};
-
-Word2VecLossPartials Word2Vec::calculateNegativeSamplingLossPartials(std::vector<unsigned int> context, unsigned int expectedWord)
-{
-    // FEEDFORWARD
-
-    /* projection is avg of context embeddings  */
-
-    xt::xtensor<float, 1> projection = xt::zeros<float>({ this->embedDimensions });
-
-    for (int i = 0;i<context.size();i++) projection += this->inputEmbedTable[context[i]];
-
-    projection /= context.size();
+    for (unsigned int word : context) 
+        for (int i = 0;i<this->embedDimensions;i++) projection[i] += this->inputEmbedMatrix[word * this->embedDimensions + i];
+        
+    for (float& component : projection) component /= context.size();
 
     static std::mt19937 gen(std::random_device{}());
     std::uniform_int_distribution<unsigned int> getRandomWord(0, this->vocabMapFromIndex.size() - 1);
@@ -147,70 +91,34 @@ Word2VecLossPartials Word2Vec::calculateNegativeSamplingLossPartials(std::vector
         if (negativeSample != expectedWord) negativeSamples.push_back(negativeSample);
     }
 
-    xt::xtensor<float, 2> dLossWrtOutputEmbedMatrix = xt::zeros_like(this->outputEmbedMatrix);
-    xt::xtensor<float, 1> dLossWrtInputContextEmbed = xt::zeros<float>({ this->embedDimensions });
+    std::vector<float> dLossWrtInputContextEmbed(this->embedDimensions, 0.0);
 
     /* gradients for expected word */
 
-    const xt::xtensor<float, 1>& targetWordOutputEmbedding = xt::view(this->outputEmbedMatrix, expectedWord, xt::all());
+    float expectedWordScore = 0.0;
+    for (int i = 0;i<this->embedDimensions;i++) expectedWordScore += projection[i] * this->outputEmbedMatrix[expectedWord * this->embedDimensions + i];
 
-    float expectedWordScore = xt::linalg::dot(projection, targetWordOutputEmbedding)();
-    float dLossWrtExpectedWordScore = 1.0 / (1.0 + std::exp(-expectedWordScore)) - 1.0;
+    float dLossWrtExpectedWordScore = 1.0 / (1.0 + exp(-expectedWordScore)) - 1.0;
 
-    xt::view(dLossWrtOutputEmbedMatrix, expectedWord, xt::all()) += dLossWrtExpectedWordScore * projection;
-    dLossWrtInputContextEmbed += dLossWrtExpectedWordScore * targetWordOutputEmbedding;
+    for (int i = 0;i<this->embedDimensions;i++) dLossWrtInputContextEmbed[i] += dLossWrtExpectedWordScore * this->outputEmbedMatrix[expectedWord * this->embedDimensions + i];
+    for (int i = 0;i<this->embedDimensions;i++) this->outputEmbedMatrix[expectedWord * this->embedDimensions + i] -= learningRate * dLossWrtExpectedWordScore * projection[i];
 
     /* gradients for negative samples */
 
     for (unsigned int negativeSample : negativeSamples) {
-        const xt::xtensor<float, 1>& negativeSampleOutputEmbedding = xt::view(this->outputEmbedMatrix, negativeSample, xt::all());
+        float negativeSampleScore = 0.0;
+        for (int i = 0;i<this->embedDimensions;i++) negativeSampleScore += projection[i] * this->outputEmbedMatrix[negativeSample * this->embedDimensions + i];
 
-        float negativeSampleScore = xt::linalg::dot(projection, negativeSampleOutputEmbedding)();
         float dLossWrtNegativeSampleScore = 1.0 / (1.0 + std::exp(-negativeSampleScore));
 
-        xt::view(dLossWrtOutputEmbedMatrix, negativeSample, xt::all()) += dLossWrtNegativeSampleScore * projection;
-        dLossWrtInputContextEmbed += dLossWrtNegativeSampleScore * negativeSampleOutputEmbedding;
+        for (int i = 0;i<this->embedDimensions;i++) dLossWrtInputContextEmbed[i] += dLossWrtNegativeSampleScore * this->outputEmbedMatrix[negativeSample * this->embedDimensions + i];
+        for (int i = 0;i<this->embedDimensions;i++) this->outputEmbedMatrix[negativeSample * this->embedDimensions + i] -= learningRate * dLossWrtNegativeSampleScore * projection[i];
     }
 
-    dLossWrtInputContextEmbed /= context.size();
+    for (float& component : dLossWrtInputContextEmbed) component /= context.size();
 
-    std::unordered_map<unsigned int, xt::xtensor<float, 1>> dLossWrtInputEmbedTable;
-
-    for (unsigned int word : context) dLossWrtInputEmbedTable[word] = dLossWrtInputContextEmbed;
-
-    return Word2VecLossPartials(dLossWrtInputEmbedTable, dLossWrtOutputEmbedMatrix);
-};
-
-void Word2Vec::applyLossPartials(Word2VecLossPartials partials, float scalar)
-{
-    for (const auto& [word, dLossWrtEmbed] : partials.inputEmbedTable) this->inputEmbedTable[word] -= scalar * dLossWrtEmbed;
-
-    this->outputEmbedMatrix -= partials.outputEmbedMatrix * scalar;
-};
-
-void Word2Vec::trainRandomBatch(int batchSize, float learningRate)
-{
-    Word2VecLossPartials batchLossPartials;
-
-    static std::mt19937 gen(std::random_device{}());
-    std::uniform_int_distribution<size_t> getRandomCorpusIndex(0, this->corpus.size() - 1 - 2 * this->contextWindowSize);
-
-    for (int i = 0;i<batchSize;i++) {
-        int randomCorpusIndex = this->contextWindowSize + getRandomCorpusIndex(gen);
-
-        std::vector<unsigned int> contextWindow;
-        contextWindow.reserve(2 * this->contextWindowSize);
-
-        for (int j = 1;j<=this->contextWindowSize;j++) {
-            contextWindow.push_back(this->corpus[randomCorpusIndex + j]);
-            contextWindow.push_back(this->corpus[randomCorpusIndex - j]);
-        }
-
-        // batchLossPartials += this->calculateSoftmaxLossPartials(contextWindow, this->corpus[randomCorpusIndex]);
-        batchLossPartials += this->calculateNegativeSamplingLossPartials(contextWindow, this->corpus[randomCorpusIndex]);
-    }
-
-    this->applyLossPartials(batchLossPartials, learningRate / batchSize);
+    for (unsigned int word : context)
+        for (int i = 0;i<this->embedDimensions;i++) this->inputEmbedMatrix[word * this->embedDimensions + i] -= learningRate * dLossWrtInputContextEmbed[i];
 };
 
 void Word2Vec::trainStochasticEpoch(float learningRate)
@@ -221,13 +129,7 @@ void Word2Vec::trainStochasticEpoch(float learningRate)
     static std::mt19937 gen(std::random_device{}());
     std::shuffle(indices.begin(), indices.end(), gen);
 
-    std::cout << "Stochastic Training Epoch Started" << std::endl;
-
-    int count = 0;
-
     for (int index : indices) {
-        if (count % 1000 == 0) std::cout << "Training " << std::fixed << std::setprecision(3) << (100.0f * (float) count / (float) this->corpus.size()) << "\% finished" << std::endl;
-
         std::vector<unsigned int> contextWindow;
         contextWindow.reserve(2 * this->contextWindowSize);
 
@@ -236,30 +138,83 @@ void Word2Vec::trainStochasticEpoch(float learningRate)
             if (index + i < this->corpus.size()) contextWindow.push_back(this->corpus[index + i]);
         }
 
-        // this->applyLossPartials(this->calculateSoftmaxLossPartials(contextWindow, this->corpus[index]), learningRate);
-        this->applyLossPartials(this->calculateNegativeSamplingLossPartials(contextWindow, this->corpus[index]), learningRate);
+        this->train(contextWindow, this->corpus[index], learningRate);
+    }
 
-        count++;
+    std::cout << "Stochastic Training Epoch Finished" << std::endl;
+};
+
+void Word2Vec::postProcess()
+{
+    /* shift by embedding mean and then normalize */
+
+    std::vector<float> meanInputEmbed(this->embedDimensions, 0.0);
+    std::vector<float> meanOutputEmbed(this->embedDimensions, 0.0);
+
+    for (int i = 0;i<this->vocabMapFromIndex.size();i++) {
+        for (int j = 0;j<this->embedDimensions;j++) {
+            meanInputEmbed[j] += this->inputEmbedMatrix[i * this->embedDimensions + j];
+            meanOutputEmbed[j] += this->outputEmbedMatrix[i * this->embedDimensions + j];
+        }
+    }
+
+    for (int i = 0;i<this->embedDimensions;i++) {
+        meanInputEmbed[i] /= this->vocabMapFromIndex.size();
+        meanOutputEmbed[i] /= this->vocabMapFromIndex.size();
+    }
+    
+    for (int i = 0;i<this->vocabMapFromIndex.size();i++) {
+        float inputEmbedMagnitude = 0.0;
+        float outputEmbedMagnitude = 0.0;
+
+        for (int j = 0;j<this->embedDimensions;j++) {
+            this->inputEmbedMatrix[i * this->embedDimensions + j] -= meanInputEmbed[j];
+            this->outputEmbedMatrix[i * this->embedDimensions + j] -= meanOutputEmbed[j];
+
+            inputEmbedMagnitude += this->inputEmbedMatrix[i * this->embedDimensions + j] * this->inputEmbedMatrix[i * this->embedDimensions + j];
+            outputEmbedMagnitude += this->outputEmbedMatrix[i * this->embedDimensions + j] * this->outputEmbedMatrix[i * this->embedDimensions + j];
+        }
+
+        inputEmbedMagnitude = sqrt(inputEmbedMagnitude);
+        outputEmbedMagnitude = sqrt(outputEmbedMagnitude);
+
+        for (int j = 0;j<this->embedDimensions;j++) {
+            this->inputEmbedMatrix[i * this->embedDimensions + j] /= inputEmbedMagnitude;
+            this->outputEmbedMatrix[i * this->embedDimensions + j] /= outputEmbedMagnitude;
+        }
     }
 };
 
-std::vector<std::string> Word2Vec::findSimilar(std::string word, int n)
+std::vector<float> Word2Vec::getEmbedding(std::string word)
 {
-    this->assertWordInVocab(word, "findSimilar");
+    this->assertWordInVocab(word, "getEmbedding");
 
-    if (n < 1) throw std::runtime_error("Word2Vec findSimilar: n must be at least 1");
+    unsigned int wordIndex = this->vocabMapFromWord[word];
+
+    return std::vector<float>(
+        this->outputEmbedMatrix.begin() + wordIndex * this->embedDimensions,
+        this->outputEmbedMatrix.begin() + (wordIndex + 1) * this->embedDimensions
+    );
+};
+
+std::vector<std::string> Word2Vec::findSimilarToEmbedding(std::vector<float> embedding, int n)
+{
+    if (embedding.size() != this->embedDimensions) throw std::runtime_error("Word2Vec findSimilarToEmbedding: embedding is the wrong size");
+
+    if (n < 1) throw std::runtime_error("Word2Vec findSimilarToEmbedding: n must be at least 1");
 
     // pairs are { (negative for min-heap) similarity, wordIndex }, pq auto compares by first item
     std::priority_queue<std::pair<float, unsigned int>> mostSimilar;
 
-    unsigned int wordIndex = this->vocabMapFromWord[word];
+    for (int i = 0;i<this->vocabMapFromIndex.size();i++) {
+        float similarity = 0.0;
+        float otherMagnitude = 0.0;
+        for (int j = 0;j<this->embedDimensions;j++) {
+            similarity += embedding[j] * this->outputEmbedMatrix[i * this->embedDimensions + j];
+            otherMagnitude += this->outputEmbedMatrix[i * this->embedDimensions + j] * this->outputEmbedMatrix[i * this->embedDimensions + j];
+        }
 
-    xt::xtensor<float, 1> wordEmbedding = this->inputEmbedTable[wordIndex];
-
-    for (int i = 0;i<this->inputEmbedTable.size();i++) {
-        if (i == wordIndex) continue;
-
-        float similarity = xt::linalg::dot(wordEmbedding, this->inputEmbedTable[i])() / xt::linalg::norm(wordEmbedding) / xt::linalg::norm(this->inputEmbedTable[i]);
+        similarity /= sqrt(otherMagnitude);
 
         mostSimilar.push({ -similarity, i });
 
@@ -279,28 +234,39 @@ std::vector<std::string> Word2Vec::findSimilar(std::string word, int n)
     return topN;
 };
 
-namespace cereal {
-    template <class Archive, size_t N>
-    void save(Archive& ar, const xt::xtensor<float, N>& vec)
-    {
-        std::vector<std::size_t> shape(vec.dimension());
-        for (size_t i = 0;i<vec.dimension();i++) shape[i] = vec.shape()[i];
+std::vector<std::string> Word2Vec::findSimilarToWord(std::string word, int n)
+{
+    this->assertWordInVocab(word, "findSimilarToWord");
 
-        std::vector<float> data(vec.begin(), vec.end());
+    if (n < 1) throw std::runtime_error("Word2Vec findSimilarToWord: n must be at least 1");
 
-        ar(shape, data);
-    };
+    // pairs are { (negative for min-heap) similarity, wordIndex }, pq auto compares by first item
+    std::priority_queue<std::pair<float, unsigned int>> mostSimilar;
 
-    template <class Archive, size_t N>
-    void load(Archive& ar, xt::xtensor<float, N>& vec)
-    {
-        std::vector<size_t> shape;
-        std::vector<float> data;
+    unsigned int wordIndex = this->vocabMapFromWord[word];
 
-        ar(shape, data);
+    for (int i = 0;i<this->vocabMapFromIndex.size();i++) {
+        if (i == wordIndex) continue;
 
-        vec = xt::adapt(data, shape);
-    };
+        float similarity = 0.0;
+        for (int j = 0;j<this->embedDimensions;j++) similarity += this->outputEmbedMatrix[wordIndex * this->embedDimensions + j] * this->outputEmbedMatrix[i * this->embedDimensions + j];
+
+        mostSimilar.push({ -similarity, i });
+
+        if (mostSimilar.size() > n) mostSimilar.pop();
+    }
+
+    std::vector<std::string> topN;
+
+    while (!mostSimilar.empty()) {
+        topN.push_back(this->vocabMapFromIndex[mostSimilar.top().second]);
+
+        mostSimilar.pop();
+    }
+
+    std::reverse(topN.begin(), topN.end());
+
+    return topN;
 };
 
 bool Word2Vec::save(std::string backupFilePath)

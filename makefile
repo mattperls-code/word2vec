@@ -1,6 +1,6 @@
 
 CXX := g++
-CXXFLAGS := -std=c++23 -Ilib -Isrc -I/opt/homebrew/include -Isystem/opt/homebrew/include -I$(CONDA_PREFIX)/include -Wall -Wextra -Wno-sign-compare -O3 -march=native -ftree-vectorize
+CXXFLAGS := -std=c++23 -Ilib -Isrc -I/opt/homebrew/include -Isystem/opt/homebrew/include -I$(CONDA_PREFIX)/include -Wall -Wextra -Wno-sign-compare -O3 -march=native -ffast-math
 
 SRC_DIR := src
 LIB_DIR := lib

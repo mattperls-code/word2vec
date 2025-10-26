@@ -17,17 +17,13 @@ void initModel(std::string corpusFilePath)
     corpus.reserve(2000000);
 
     std::string word;
-    while (corpusFile >> word) {
-        corpus.push_back(word);
-
-        // if (corpus.size() == 2000000) break;
-    }
+    while (corpusFile >> word) corpus.push_back(word);
 
     corpusFile.close();
 
     std::cout << "Corpus size: " << corpus.size() << std::endl;
 
-    Word2Vec model(corpus, 4, 10, 160);
+    model = Word2Vec(corpus, 4, 10, 150);
 
     std::cout << "Initialized Model" << std::endl << std::endl;
 };
@@ -72,11 +68,26 @@ void saveModel()
 
 void trainModel()
 {
-    std::cout << "Starting Training Epoch" << std::endl;
+    std::cout << "How Many Epochs? ";
 
-    model.trainStochasticEpoch(0.1);
+    unsigned int n;
 
-    std::cout << "Finished Training Epoch" << std::endl << std::endl;
+    std::cin >> n;
+
+    std::cout << std::endl;
+
+    for (int i = 0;i<n;i++) model.trainStochasticEpoch(0.02);
+
+    std::cout << "Finished Training" << std::endl << std::endl;
+};
+
+void postProcess()
+{
+    std::cout << "Post Processing" << std::endl;
+
+    model.postProcess();
+
+    std::cout << std::endl;
 };
 
 void testModel()
@@ -89,13 +100,13 @@ void testModel()
         std::cout << word << ": ";
 
         try {
-            std::vector<std::string> similarToWord = model.findSimilar(word, 8);
+            std::vector<std::string> similarToWord = model.findSimilarToWord(word, 8);
 
             for (const auto& similarWord : similarToWord) std::cout << similarWord << " ";
 
             std::cout << std::endl;
-        } catch (std::runtime_error e) {
-            std::cout << word << " failed: " << e.what() << std::endl;
+        } catch (std::runtime_error err) {
+            std::cout << word << " failed: " << err.what() << std::endl;
         };
     }
 
@@ -113,28 +124,49 @@ void getSimilar()
     std::cout << std::endl;
     
     try {
-        std::vector<std::string> similarToWord = model.findSimilar(word, 8);
+        std::vector<std::string> similarToWord = model.findSimilarToWord(word, 8);
 
         for (const auto& similarWord : similarToWord) std::cout << similarWord << " ";
 
         std::cout << std::endl;
-    } catch (std::runtime_error e) {
-        std::cout << word << " failed: " << e.what() << std::endl;
+    } catch (std::runtime_error err) {
+        std::cout << word << " failed: " << err.what() << std::endl;
     };
 
     std::cout << std::endl;
 };
 
+void evaluate()
+{
+    std::cout << "Evaluating Composition" << std::endl;
+
+    std::vector<float> kingEmbedding = model.getEmbedding("king");
+    std::vector<float> manEmbedding = model.getEmbedding("man");
+    std::vector<float> womanEmbedding = model.getEmbedding("woman");
+
+    std::vector<float> composition;
+
+    for (int i = 0;i<kingEmbedding.size();i++) composition.push_back(kingEmbedding[i] + womanEmbedding[i] - manEmbedding[i]);
+
+    std::vector<std::string> similarToComposition = model.findSimilarToEmbedding(composition, 8);
+
+    std::cout << "Similar to (king + woman - man): ";
+
+    for (const auto& similarWord : similarToComposition) std::cout << similarWord << " ";
+
+    std::cout << std::endl << std::endl;
+};
+
 int main()
 {
-    initModel("./app/cleanCorpus/text8");
-    
     std::cout << std::endl << "Welcome to the Word2Vec demo!" << std::endl << std::endl;
+
+    initModel("./app/cleanCorpus/text8");
 
     while (true) {
         std::string command;
 
-        std::cout << "Enter a command (LOAD, SAVE, TRAIN, TEST, SIMILAR, EXIT): ";
+        std::cout << "Enter a command (LOAD, SAVE, TRAIN, POSTPROCESS, TEST, SIMILAR, EVALUATE, EXIT): ";
 
         std::cin >> command;
 
@@ -146,9 +178,13 @@ int main()
 
         else if (command == "TRAIN") trainModel();
 
+        else if (command == "POSTPROCESS") postProcess();
+
         else if (command == "TEST") testModel();
 
         else if (command == "SIMILAR") getSimilar();
+
+        else if (command == "EVALUATE") evaluate();
 
         else if (command == "EXIT") break;
 
